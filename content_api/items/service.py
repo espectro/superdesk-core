@@ -18,8 +18,7 @@ from superdesk.services import BaseService
 from superdesk.utc import utcnow
 from urllib.parse import urljoin, urlparse, quote
 
-from flask import current_app as app, g
-from flask import request
+from flask import current_app as app, g, request
 from werkzeug.datastructures import MultiDict
 
 from content_api.app.settings import ELASTIC_DATE_FORMAT
@@ -215,10 +214,16 @@ class ItemsService(BaseService):
         if item.get('renditions'):
             for _k, v in item['renditions'].items():
                 if 'media' in v:
-                    href = v.get('href')
                     media = v.pop('media')
-                    v['href'] = app.media.url_for_media(media, v.get('mimetype'))
-                    hrefs[href] = v['href']
+                    href = (
+                        app.media.get_redirect_url(media) or
+                        app.media.url_for_media(media, v.get('mimetype'))
+                    )
+                    # keep full urls here
+                    if not href.startswith('http'):
+                        href = request.url_root + href.lstrip('/')
+                    hrefs[v.get('href')] = href
+                    v['href'] = href
         return hrefs
 
     def _process_item_associations(self, item):
